@@ -1,0 +1,33 @@
+html,body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #000;
+}
+
+.player{
+    max-width: 90%;
+    margin: auto;
+    height: 80%;
+    display: table;
+    text-align: center;
+}
+
+.player > div {
+    display: table-cell;
+    vertical-align: middle;
+}
+
+.player > div video{
+    max-width: 100%;
+}
+
+#div_files{
+    height: 20%;
+    overflow: auto;
+}
+
+#div_files a{
+display:block;
+color: #ddd;
+}
