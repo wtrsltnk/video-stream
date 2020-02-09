@@ -4,7 +4,7 @@
 #include <map>
 #include <string>
 
-#include "HttpRequest.h"
+#include "httprequest.h"
 
 namespace net {
 

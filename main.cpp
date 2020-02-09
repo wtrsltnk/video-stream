@@ -100,8 +100,8 @@ std::string urlDecode(std::string &SRC)
 {
     std::string ret;
     char ch;
-    int i, ii;
-    for (i = 0; i < SRC.length(); i++)
+    int ii;
+    for (unsigned int i = 0; i < SRC.length(); i++)
     {
         if (int(SRC[i]) == 37)
         {
@@ -117,6 +117,7 @@ std::string urlDecode(std::string &SRC)
     }
     return (ret);
 }
+
 int onRecieveRequest(const net::Request &request, net::Response &response)
 {
     std::string contentRoot = "../video-stream";
@@ -190,7 +191,6 @@ int onRecieveRequest(const net::Request &request, net::Response &response)
 
     for (auto &header : request._headers)
     {
-
         if (header.first.compare("Range") == 0)
         {
             std::regex pattern("bytes=([0-9]+)\\-([0-9]*)");
