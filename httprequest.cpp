@@ -55,7 +55,7 @@ static std::map<int, std::string> responseCodes = std::map<int, std::string>(
 // trim from start
 static inline std::string &ltrim(std::string &s)
 {
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int c) { return !std::isspace(c); }));
     return s;
 }
 
@@ -63,7 +63,7 @@ static inline std::string &ltrim(std::string &s)
 static inline std::string &rtrim(std::string &s)
 {
     s.erase(std::find_if(s.rbegin(), s.rend(),
-                         std::not1(std::ptr_fun<int, int>(std::isspace)))
+                         [](int c) { return !std::isspace(c); })
                 .base(),
             s.end());
     return s;
@@ -109,11 +109,11 @@ Request::Request(SOCKET socket, sockaddr_in clientInfo)
         // Determine headers
         while (std::getline(ss, line))
         {
-            auto pos = line.find_first_of(':');
-            if (pos != std::string::npos)
+            auto found = line.find_first_of(':');
+            if (found != std::string::npos)
             {
-                auto key = line.substr(0, pos);
-                auto value = line.substr(pos + 1);
+                auto key = line.substr(0, found);
+                auto value = line.substr(found + 1);
                 this->_headers.insert(std::make_pair(trim(key), trim(value)));
             }
         }
@@ -129,23 +129,32 @@ std::string Request::getMessage()
     int bytes;
 
     bytes = recv(this->_socket, buffer, BUFFER_SIZE, 0);
+    if (bytes < 0)
+    {
+        return "";
+    }
+
     buffer[bytes] = '\0';
-    std::string browserData = buffer;
+
+    std::stringstream browserData;
+    browserData << buffer;
 
     while (BUFFER_SIZE == bytes)
     {
         bytes = recv(this->_socket, buffer, BUFFER_SIZE, 0);
         buffer[bytes] = '\0';
-        browserData += buffer;
+        browserData << buffer;
     }
 
-    return browserData;
+    return browserData.str();
 }
 
 #define STREAMING_TRESHOLD 1024
 
 // The function we want to execute on the new thread.
-void Request::handleRequest(std::function<int(const Request &, Response &)> onConnection, Request request)
+void Request::handleRequest(
+    std::function<int(const Request &, Response &)> onConnection,
+    Request request)
 {
     if (request._method == "")
     {
@@ -164,7 +173,7 @@ void Request::handleRequest(std::function<int(const Request &, Response &)> onCo
 
     headers << "HTTP/1.1 " << responseCode << " " << responseCodes[responseCode] << "\r\n";
 
-    for (auto pair : response._headers)
+    for (auto &pair : response._headers)
     {
         headers << pair.first << ": " << pair.second << "\r\n";
     }

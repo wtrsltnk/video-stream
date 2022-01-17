@@ -31,6 +31,7 @@ HttpServer::HttpServer(int port)
     _listeningSocket = INVALID_SOCKET;
     _socketVersion = MAKEWORD(2, 2);
     _port = port;
+    _result = nullptr;
 }
 
 void HttpServer::SetLogging(std::function<void(const std::string &)> logging)

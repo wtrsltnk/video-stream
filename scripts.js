@@ -13,7 +13,7 @@ function addSourceToVideo(video, src, type) {
 function init(){
     const Http = new XMLHttpRequest();
     Http.onreadystatechange = function() {
-        if (this.readyState == 4 && this.status == 200) {
+        if (this.readyState === 4 && this.status === 200) {
             var obj = JSON.parse(Http.responseText);
 
             var div_files = document.getElementById("div_files");

@@ -6,7 +6,9 @@
 #include <iomanip>
 #include <iostream>
 #include <iterator>
+#include <nlohmann/json.hpp>
 #include <regex>
+#include <sstream>
 #include <string>
 #include <thread>
 
@@ -15,17 +17,18 @@
 int onRecieveRequest(const net::Request &request, net::Response &response);
 
 static std::string root = "../video-stream";
+static bool _isRunning = true;
 
-int main(int argc, char *argv[])
+int main(
+    int argc,
+    char *argv[])
 {
     if (argc > 1)
     {
         root = argv[1];
     }
 
-    net::HttpServer _server;
-    std::thread _thread;
-    bool _isRunning = true;
+    net::HttpServer _server(80);
 
     _server.Init();
 
@@ -40,38 +43,6 @@ int main(int argc, char *argv[])
     }
 
     return 0;
-}
-
-void GetFiles(std::vector<std::string> &files, std::string const &root, std::string const &relativePath = "/")
-{
-#ifdef _WIN32
-    HANDLE hFind;
-    WIN32_FIND_DATA data;
-
-    std::string lookFor = root + relativePath + "*";
-
-    std::cout << lookFor << std::endl;
-    hFind = FindFirstFile(lookFor.c_str(), &data);
-    if (hFind != INVALID_HANDLE_VALUE)
-    {
-        do
-        {
-            if (!(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-            {
-                files.push_back(relativePath + data.cFileName);
-            }
-            else
-            {
-                if (data.cFileName[0] == '.')
-                {
-                    continue;
-                }
-                GetFiles(files, root, relativePath + data.cFileName + "/");
-            }
-        } while (FindNextFile(hFind, &data));
-        FindClose(hFind);
-    }
-#endif // _WIN32
 }
 
 const char DirectorySeparatorChar = '\\';
@@ -96,7 +67,51 @@ std::string FileExtension(std::string const &fullpath)
     }
     return "";
 }
-std::string urlDecode(std::string &SRC)
+
+void GetFiles(
+    std::vector<std::string> &files,
+    std::string const &root,
+    std::string const &relativePath = "/")
+{
+#ifdef _WIN32
+    HANDLE hFind;
+    WIN32_FIND_DATA data;
+
+    std::string lookFor = root + relativePath + "*";
+
+    std::cout << lookFor << std::endl;
+    hFind = FindFirstFile(lookFor.c_str(), &data);
+    if (hFind != INVALID_HANDLE_VALUE)
+    {
+        do
+        {
+            if (!(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+            {
+                auto ext = FileExtension(data.cFileName);
+                // if (ext != ".avi" && ext != ".mp4" && ext != ".mov" && ext != ".ogg") {
+                if (ext != ".mp4" && ext != ".ogg")
+                {
+                    continue;
+                }
+                files.push_back(relativePath + data.cFileName);
+            }
+            else
+            {
+                if (data.cFileName[0] == '.')
+                {
+                    continue;
+                }
+                GetFiles(files, root, relativePath + data.cFileName + "/");
+            }
+        } while (FindNextFile(hFind, &data));
+
+        FindClose(hFind);
+    }
+#endif // _WIN32
+}
+
+std::string urlDecode(
+    const std::string &SRC)
 {
     std::string ret;
     char ch;
@@ -118,14 +133,15 @@ std::string urlDecode(std::string &SRC)
     return (ret);
 }
 
-int onRecieveRequest(const net::Request &request, net::Response &response)
+int onRecieveRequest(
+    const net::Request &request,
+    net::Response &response)
 {
     std::string contentRoot = "../video-stream";
     int result = 200;
 
     if (request._uri == "/")
     {
-
         std::ifstream stream(contentRoot + "/index.html");
 
         response.addHeader("Content-Type", "text/html");
@@ -136,7 +152,6 @@ int onRecieveRequest(const net::Request &request, net::Response &response)
 
     if (request._uri == "/css")
     {
-
         std::ifstream stream(contentRoot + "/styles.css");
 
         response.addHeader("Content-Type", "text/css");
@@ -147,7 +162,6 @@ int onRecieveRequest(const net::Request &request, net::Response &response)
 
     if (request._uri == "/js")
     {
-
         std::ifstream stream(contentRoot + "/scripts.js");
 
         response.addHeader("Content-Type", "application/javascript");
@@ -158,27 +172,19 @@ int onRecieveRequest(const net::Request &request, net::Response &response)
 
     if (request._uri == "/data")
     {
-
         response.addHeader("Content-Type", "application/json");
 
         std::vector<std::string> files;
+
         GetFiles(files, root);
 
-        const char *separator = "";
+        nlohmann::json filesJson = {
+            {"files", files},
+        };
+
         std::stringstream json;
-        json << "{\"files\":[";
-        for (auto &f : files)
-        {
-            auto ext = FileExtension(f);
-            // if (ext != ".avi" && ext != ".mp4" && ext != ".mov" && ext != ".ogg") {
-            if (ext != ".mp4" && ext != ".ogg")
-            {
-                continue;
-            }
-            json << separator << "\"" << f << "\"";
-            separator = ",";
-        }
-        json << "]}";
+
+        json << filesJson.dump();
 
         response._response = json.str();
 
@@ -214,9 +220,7 @@ int onRecieveRequest(const net::Request &request, net::Response &response)
 
     response.addHeader("Accept-Ranges", "bytes");
 
-    std::string r = request._uri;
-    r = urlDecode(r);
-    std::cout << r << std::endl;
+    std::string r = urlDecode(request._uri);
 
     std::stringstream ss;
     ss << root << r;
