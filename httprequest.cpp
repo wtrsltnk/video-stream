@@ -178,7 +178,14 @@ void Request::handleRequest(
         headers << pair.first << ": " << pair.second << "\r\n";
     }
 
-    headers << "Content-Length: " << response._response.size() << "\r\n"
+    long long contentSize = response._contentSize;
+
+    if (contentSize == 0 && !response._response.empty())
+    {
+        contentSize = response._response.size();
+    }
+
+    headers << "Content-Length: " << contentSize << "\r\n"
             << "\r\n";
 
     send(request._socket, headers.str().c_str(), headers.str().size(), 0);

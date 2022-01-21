@@ -1,8 +1,10 @@
 #include "httprequest.h"
 #include "httpresponse.h"
+#include "httprouter.h"
 #include "httpserver.h"
 #include <chrono>
 #include <filesystem>
+#include <fmt/chrono.h>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -14,87 +16,6 @@
 #include <thread>
 
 #define MAX_RANGE_SIZE (1024 * 1024)
-
-typedef std::function<void(const net::Request &request, net::Response &response, const std::smatch &matches)> RouteHandler;
-typedef std::vector<std::pair<std::regex, RouteHandler>> RouteCollection;
-
-class Router
-{
-public:
-    void Get(
-        const std::string &pattern,
-        RouteHandler handler);
-
-    void Post(
-        const std::string &pattern,
-        RouteHandler handler);
-
-    bool Route(
-        const net::Request &request,
-        net::Response &response);
-
-private:
-    RouteCollection _getRoutes;
-    RouteCollection _postRoutes;
-    RouteCollection _putRoutes;
-};
-
-void Router::Get(
-    const std::string &pattern,
-    RouteHandler handler)
-{
-    auto r = std::regex(pattern);
-
-    _getRoutes.push_back(std::make_pair(std::move(r), handler));
-}
-
-void Router::Post(
-    const std::string &pattern,
-    RouteHandler handler)
-{
-    auto r = std::regex(pattern);
-
-    _postRoutes.push_back(std::make_pair(std::move(r), handler));
-}
-
-bool Router::Route(
-    const net::Request &request,
-    net::Response &response)
-{
-    if (request._method == "GET")
-    {
-        for (auto &route : _getRoutes)
-        {
-            std::smatch matches;
-            if (!std::regex_match(request._uri, matches, route.first))
-            {
-                continue;
-            }
-
-            route.second(request, response, matches);
-
-            return true;
-        }
-    }
-
-    else if (request._method == "POST")
-    {
-        for (auto &route : _postRoutes)
-        {
-            std::smatch matches;
-            if (!std::regex_match(request._uri, matches, route.first))
-            {
-                continue;
-            }
-
-            route.second(request, response, matches);
-
-            return true;
-        }
-    }
-
-    return false;
-}
 
 int onRecieveRequest(const net::Request &request, net::Response &response);
 
@@ -160,6 +81,8 @@ void FileRangeResponse(
     {
         if (header.first.compare("Range") == 0)
         {
+            fmt::print("Range: {}\n", header.second);
+
             std::regex pattern("bytes=([0-9]+)\\-([0-9]*)");
             auto words_begin = std::sregex_iterator(header.second.begin(), header.second.end(), pattern);
 
@@ -179,46 +102,54 @@ void FileRangeResponse(
         }
     }
 
-    response.addHeader("Accept-Ranges", "bytes");
-
     std::ifstream stream(file, std::ios::binary | std::ios::ate);
 
     long long size = stream.tellg();
 
+    if (rangeEnd >= size)
+    {
+        response._responseCode = 416;
+
+        return;
+    }
+
+    fmt::print("rangeStart {}\n", rangeStart);
+    fmt::print("rangeEnd   {}\n", rangeEnd);
+    fmt::print("size       {}\n", size);
     if (!rangeRequested && size < MAX_RANGE_SIZE)
     {
+        response._responseCode = 200;
+
         stream.seekg(0, stream.beg);
         response._response = std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
     }
     else
     {
+        response.addHeader("Accept-Ranges", "bytes");
+
+        response._responseCode = 206;
+
         if (rangeEnd == 0)
         {
             if (size > MAX_RANGE_SIZE)
             {
                 rangeEnd = rangeStart + MAX_RANGE_SIZE;
-                response._responseCode = 206;
             }
             else
             {
                 rangeEnd = static_cast<unsigned long>(size);
             }
         }
-        if (rangeStart > 0)
-        {
-            response._responseCode = 206;
-        }
 
         stream.seekg(rangeStart, stream.beg);
-        auto rangeSize = rangeEnd - rangeStart;
+
+        auto rangeSize = rangeEnd - rangeStart + 1;
 
         std::string buffer;
         buffer.resize(rangeSize);
         stream.read(&buffer[0], static_cast<std::streamsize>(rangeSize));
 
-        std::stringstream contentRange;
-        contentRange << "bytes " << rangeStart << "-" << rangeEnd << "/" << size;
-        response.addHeader("Content-Range", contentRange.str());
+        response.addHeader("Content-Range", fmt::format("bytes {}-{}/{}", rangeStart, rangeEnd, size));
 
         response._response = buffer;
     }
@@ -273,15 +204,15 @@ int main(
     Router router;
 
     router.Get("/", [&](const net::Request &, net::Response &response, const std::smatch &) {
-        FileResponse(response, contentRoot / "index.html", "text/html");
+        FileResponse(response, contentRoot / "htdocs" / "index.html", "text/html");
     });
 
     router.Get("/css", [&](const net::Request &, net::Response &response, const std::smatch &) {
-        FileResponse(response, contentRoot / "styles.css", "text/css");
+        FileResponse(response, contentRoot / "htdocs" / "styles.css", "text/css");
     });
 
     router.Get("/js", [&](const net::Request &, net::Response &response, const std::smatch &) {
-        FileResponse(response, contentRoot / "scripts.js", "application/javascript");
+        FileResponse(response, contentRoot / "htdocs" / "scripts.js", "application/javascript");
     });
 
     router.Get("/data", [&](const net::Request &, net::Response &response, const std::smatch &) {
@@ -301,9 +232,9 @@ int main(
         {
             response.addHeader("Content-Type", "video/mp4");
         }
-        else if (fileName.extension() == ".avi")
+        else if (fileName.extension() == ".mkv")
         {
-            response.addHeader("Content-Type", "video/avi");
+            response.addHeader("Content-Type", "video/mkv");
         }
 
         FileRangeResponse(request, response, file);
@@ -378,7 +309,7 @@ void GetFiles(
             if (!(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
             {
                 auto ext = FileExtension(data.cFileName);
-                if (ext != ".mp4" && ext != ".ogg")
+                if (ext != ".mp4" && ext != ".ogg" && ext != ".mkv")
                 {
                     continue;
                 }

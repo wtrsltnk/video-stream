@@ -19,6 +19,7 @@ public:
     int _responseCode;
     std::map<std::string, std::string> _headers;
     std::string _response;
+    long long _contentSize = 0;
 };
 
 } // namespace net
