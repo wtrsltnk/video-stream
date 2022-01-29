@@ -15,7 +15,7 @@
 #include <string>
 #include <thread>
 
-#define MAX_RANGE_SIZE (1024 * 1024)
+#define MAX_RANGE_SIZE (1000 * 10000)
 
 int onRecieveRequest(const net::Request &request, net::Response &response);
 
@@ -116,24 +116,25 @@ void FileRangeResponse(
     fmt::print("rangeStart {}\n", rangeStart);
     fmt::print("rangeEnd   {}\n", rangeEnd);
     fmt::print("size       {}\n", size);
-    if (!rangeRequested && size < MAX_RANGE_SIZE)
+    if (!rangeRequested || size < MAX_RANGE_SIZE)
     {
-        response._responseCode = 200;
+        response._responseCode = 206;
+        response.addHeader("Accept-Ranges", "bytes");
 
-        stream.seekg(0, stream.beg);
-        response._response = std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
+        //        stream.seekg(0, stream.beg);
+        //      response._response = std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
     }
     else
     {
-        response.addHeader("Accept-Ranges", "bytes");
-
         response._responseCode = 206;
+
+        response.addHeader("Accept-Ranges", "bytes");
 
         if (rangeEnd == 0)
         {
             if (size > MAX_RANGE_SIZE)
             {
-                rangeEnd = rangeStart + MAX_RANGE_SIZE;
+                rangeEnd = rangeStart + MAX_RANGE_SIZE - 1;
             }
             else
             {
@@ -149,8 +150,14 @@ void FileRangeResponse(
         buffer.resize(rangeSize);
         stream.read(&buffer[0], static_cast<std::streamsize>(rangeSize));
 
-        response.addHeader("Content-Range", fmt::format("bytes {}-{}/{}", rangeStart, rangeEnd, size));
+        auto contentRange = fmt::format("bytes {}-{}/{}", rangeStart, rangeEnd, size);
+        response.addHeader("Content-Range", contentRange);
 
+        fmt::print("Content-Range: {}\n", contentRange);
+
+        // the following is needed for when VLC is requesting a stream, dont ask me why:
+        // see for more info: https://stackoverflow.com/questions/61459515/using-http-range-request-to-stream-video-files
+        //        response._contentSize = size;
         response._response = buffer;
     }
 }

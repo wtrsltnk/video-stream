@@ -6,4 +6,4 @@
 
 
 
-"C:\Program Files\ffmpeg-2022-01-19-git-dd17c86aa1-essentials_build\bin\ffmpeg.exe" -i the.matrix.resurrections.2021.720p.web.h264-naisu-4chromecast.mp4 -preset fast -c:a aac -b:a 192k -ac 2 -c:v libx264 -b:v 1024k -profile:v high -level 4.1 -crf -1 -pix_fmt yuv420p the.matrix.resurrections.2021.720p.web.h264-naisu.mp4
+"C:\Program Files\ffmpeg-2022-01-19-git-dd17c86aa1-essentials_build\bin\ffmpeg.exe" -i the.matrix.resurrections.2021.720p.web.h264-naisu.mp4 -preset fast -c:a aac -b:a 192k -ac 2 -c:v libx264 -b:v 1024k -profile:v high -level 4.1 -crf -1 -pix_fmt yuv420p transcoded\the.matrix.resurrections.2021.720p.web.h264-naisu.mp4

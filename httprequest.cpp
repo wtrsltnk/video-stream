@@ -3,6 +3,7 @@
 #include "httpresponse.h"
 #include <algorithm>
 #include <cctype>
+#include <fmt/printf.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -188,6 +189,8 @@ void Request::handleRequest(
     headers << "Content-Length: " << contentSize << "\r\n"
             << "\r\n";
 
+    auto hdrs = headers.str();
+    fmt::print("{}\n", hdrs);
     send(request._socket, headers.str().c_str(), headers.str().size(), 0);
     send(request._socket, response._response.c_str(), response._response.size(), 0);
 
