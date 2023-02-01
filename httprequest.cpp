@@ -54,14 +54,16 @@ static std::map<int, std::string> responseCodes = std::map<int, std::string>(
      {505, "HTTP Version Not Supported"}});
 
 // trim from start
-static inline std::string &ltrim(std::string &s)
+static inline std::string &ltrim(
+    std::string &s)
 {
     s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int c) { return !std::isspace(c); }));
     return s;
 }
 
 // trim from end
-static inline std::string &rtrim(std::string &s)
+static inline std::string &rtrim(
+    std::string &s)
 {
     s.erase(std::find_if(s.rbegin(), s.rend(),
                          [](int c) { return !std::isspace(c); })
@@ -71,13 +73,17 @@ static inline std::string &rtrim(std::string &s)
 }
 
 // trim from both ends
-static inline std::string &trim(std::string &s)
+static inline std::string &trim(
+    std::string &s)
 {
     return ltrim(rtrim(s));
 }
 
-Request::Request(SOCKET socket, sockaddr_in clientInfo)
-    : _socket(socket), _clientInfo(clientInfo)
+Request::Request(
+    SOCKET socket,
+    sockaddr_in clientInfo)
+    : _socket(socket),
+      _clientInfo(clientInfo)
 {
     std::string allData = getMessage();
     auto pos = allData.find("\r\n\r\n");
@@ -152,6 +158,20 @@ std::string Request::getMessage()
 
 #define STREAMING_TRESHOLD 1024
 
+bool KeepAlive(
+    const std::map<std::string, std::string> &headers)
+{
+    for (const auto &header : headers)
+    {
+        if (header.first == "Connection" && header.second == "keep-alive")
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // The function we want to execute on the new thread.
 void Request::handleRequest(
     std::function<int(const Request &, Response &)> onConnection,
@@ -166,33 +186,57 @@ void Request::handleRequest(
         return;
     }
 
-    Response response;
-
-    int responseCode = onConnection(request, response);
-
-    std::stringstream headers;
-
-    headers << "HTTP/1.1 " << responseCode << " " << responseCodes[responseCode] << "\r\n";
-
-    for (auto &pair : response._headers)
+    while (true)
     {
-        headers << pair.first << ": " << pair.second << "\r\n";
+        fmt::print("\n============================================================\nRequest Headers\n");
+        for (const auto &header : request._headers)
+        {
+            fmt::print("{}: {}\n", header.first, header.second);
+        }
+
+        Response response;
+
+        int responseCode = onConnection(request, response);
+
+        std::stringstream headerData;
+
+        headerData << "HTTP/1.1 " << responseCode << " " << responseCodes[responseCode] << "\r\n";
+
+        for (auto &pair : response._headers)
+        {
+            headerData << pair.first << ": " << pair.second << "\r\n";
+        }
+
+        long long contentSize = response._contentSize;
+
+        if (contentSize == 0 && !response._response.empty())
+        {
+            contentSize = response._response.size();
+        }
+
+        headerData << "Content-Length: " << contentSize << "\r\n"
+                << "\r\n";
+
+        fmt::print("============================================================\nResponse Headers\n");
+        for (const auto &header : response._headers)
+        {
+            fmt::print("{}: {}\n", header.first, header.second);
+        }
+
+        auto hdrs = headerData.str();
+
+        send(request._socket, headerData.str().c_str(), headerData.str().size(), 0);
+
+        send(request._socket, response._response.c_str(), response._response.size(), 0);
+
+        if (!KeepAlive(request._headers))
+        {
+            fmt::print("####### Not keeping this connection alive ####### \n\n");
+            break;
+        }
+
+        request = Request(request._socket, request._clientInfo);
     }
-
-    long long contentSize = response._contentSize;
-
-    if (contentSize == 0 && !response._response.empty())
-    {
-        contentSize = response._response.size();
-    }
-
-    headers << "Content-Length: " << contentSize << "\r\n"
-            << "\r\n";
-
-    auto hdrs = headers.str();
-    fmt::print("{}\n", hdrs);
-    send(request._socket, headers.str().c_str(), headers.str().size(), 0);
-    send(request._socket, response._response.c_str(), response._response.size(), 0);
 
     shutdown(request._socket, SD_BOTH);
     closesocket(request._socket);

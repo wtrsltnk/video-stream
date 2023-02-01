@@ -15,7 +15,7 @@
 #include <string>
 #include <thread>
 
-#define MAX_RANGE_SIZE (1000 * 10000)
+#define MAX_RANGE_SIZE (5000000)
 
 int onRecieveRequest(const net::Request &request, net::Response &response);
 
@@ -106,23 +106,26 @@ void FileRangeResponse(
 
     long long size = stream.tellg();
 
-    if (rangeEnd >= size)
+    if (rangeStart > 0 && rangeEnd == 0)
+    {
+        rangeEnd = std::min<int>(size, rangeStart + MAX_RANGE_SIZE);
+    }
+
+    if (rangeEnd > size)
     {
         response._responseCode = 416;
 
         return;
     }
 
-    fmt::print("rangeStart {}\n", rangeStart);
-    fmt::print("rangeEnd   {}\n", rangeEnd);
-    fmt::print("size       {}\n", size);
     if (!rangeRequested || size < MAX_RANGE_SIZE)
     {
-        response._responseCode = 206;
-        response.addHeader("Accept-Ranges", "bytes");
+        fmt::print("rangeRequested: {}\n", rangeRequested);
 
-        //        stream.seekg(0, stream.beg);
-        //      response._response = std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
+        response._responseCode = 200;
+
+        stream.seekg(0, stream.beg);
+        response._response = std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
     }
     else
     {
@@ -134,7 +137,7 @@ void FileRangeResponse(
         {
             if (size > MAX_RANGE_SIZE)
             {
-                rangeEnd = rangeStart + MAX_RANGE_SIZE - 1;
+                rangeEnd = rangeStart + MAX_RANGE_SIZE;
             }
             else
             {
@@ -144,20 +147,18 @@ void FileRangeResponse(
 
         stream.seekg(rangeStart, stream.beg);
 
-        auto rangeSize = rangeEnd - rangeStart + 1;
-
         std::string buffer;
-        buffer.resize(rangeSize);
-        stream.read(&buffer[0], static_cast<std::streamsize>(rangeSize));
+        buffer.resize(MAX_RANGE_SIZE);
+        stream.read(&buffer[0], static_cast<std::streamsize>(MAX_RANGE_SIZE));
 
-        auto contentRange = fmt::format("bytes {}-{}/{}", rangeStart, rangeEnd, size);
+        auto contentRange = fmt::format("bytes {}-{}/{}", rangeStart, rangeEnd - 1, size);
         response.addHeader("Content-Range", contentRange);
 
         fmt::print("Content-Range: {}\n", contentRange);
 
         // the following is needed for when VLC is requesting a stream, dont ask me why:
         // see for more info: https://stackoverflow.com/questions/61459515/using-http-range-request-to-stream-video-files
-        //        response._contentSize = size;
+        // response._contentSize = size;
         response._response = buffer;
     }
 }
@@ -180,6 +181,7 @@ int main(
     if (argc > 1)
     {
         videoRoot = argv[1];
+        contentRoot = argv[1];
     }
 
     if (!std::filesystem::exists(videoRoot))
