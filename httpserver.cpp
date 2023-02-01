@@ -1,6 +1,6 @@
 #include "httpserver.h"
-#include "HttpRequest.h"
-#include "HttpResponse.h"
+#include "httprequest.h"
+#include "httpresponse.h"
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -8,7 +8,8 @@
 using namespace net;
 
 // Global Functions
-std::string ToString(int data)
+std::string ToString(
+    int data)
 {
     std::stringstream buffer;
     buffer << data;
@@ -16,7 +17,8 @@ std::string ToString(int data)
 }
 
 // Constructor
-HttpServer::HttpServer(int port)
+HttpServer::HttpServer(
+    int port)
     : _logging([](const std::string &message) { std::cout << message << std::endl; })
 {
     // Socket Settings
@@ -31,9 +33,11 @@ HttpServer::HttpServer(int port)
     _listeningSocket = INVALID_SOCKET;
     _socketVersion = MAKEWORD(2, 2);
     _port = port;
+    _result = nullptr;
 }
 
-void HttpServer::SetLogging(std::function<void(const std::string &)> logging)
+void HttpServer::SetLogging(
+    std::function<void(const std::string &)> logging)
 {
     this->_logging = logging;
 }
@@ -42,7 +46,8 @@ int HttpServer::Port() const
 {
     return _port;
 }
-void HttpServer::SetPort(int port)
+void HttpServer::SetPort(
+    int port)
 {
     _port = port;
 }
@@ -113,7 +118,8 @@ bool HttpServer::Start()
     return true;
 }
 
-void HttpServer::WaitForRequests(std::function<int(const Request &, Response &)> onConnection)
+void HttpServer::WaitForRequests(
+    std::function<int(const Request &, Response &)> onConnection)
 {
     sockaddr_in clientInfo;
     int clientInfoSize = sizeof(clientInfo);

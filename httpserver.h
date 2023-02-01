@@ -17,10 +17,10 @@ class HttpServer
     WSADATA _wsaData;
     SOCKET _listeningSocket;
     addrinfo _hints, *_result;
-    int _maxConnections;
+    int _maxConnections = 100;
 
     //  Server Info
-    int _port;
+    int _port = DEFAULT_PORT;
 
 public:
     HttpServer(int port = DEFAULT_PORT);
