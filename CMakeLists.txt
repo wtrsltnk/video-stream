@@ -7,18 +7,19 @@ CPMAddPackage("gh:fmtlib/fmt#7.1.3")
 CPMAddPackage("gh:nlohmann/json@3.10.5")
 
 add_executable(${PROJECT_NAME}
-    main.cpp
-    httpserver.cpp
-    httpserver.h
+    htdocs/index.html
+    htdocs/scripts.js
+    htdocs/styles.css
     httprequest.cpp
     httprequest.h
     httpresponse.cpp
     httpresponse.h
     httprouter.cpp
     httprouter.h
-    htdocs/index.html
-    htdocs/styles.css
-    htdocs/scripts.js
+    httpserver.cpp
+    httpserver.h
+    main.cpp
+    README.md
 )
 
 target_compile_features(${PROJECT_NAME}
