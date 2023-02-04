@@ -1,31 +1,72 @@
+
 <!DOCTYPE html>
 <html>
     <head>
-    <meta charset="UTF-8">
-    <title>Title of the document</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300&family=Ubuntu+Mono&display=swap" rel="stylesheet">
-    <link rel="stylesheet" type="text/css" href="/css">
+        <!--Let browser know website is optimized for mobile-->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+        <title>Title of the document</title>
+
+        <!--Import Google Icon Font-->
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+        <!-- Compiled and minified CSS -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" type="text/css" href="/css">
     </head>
     <body>
-        <div class="player">
-            <div>
-                <video id="video"
-                       preload="metadata"
-                       autoplay=""
-                       webkit-playsinline=""
-                       playsinline=""
-                       type="video/mp4"
-                       width="80%"
-                       controls=""
-                       crossorigin="anonymous"/>
+        <div class="navbar">
+            <nav>
+                <div class="nav-wrapper teal z-depth-5">
+                    <a href="#!" class="brand-logo center hide-on-med-and-down">
+                        Local Video Player
+                    </a>
+                    <ul class="left">
+                        <li>
+                            <a href="#" data-target="slide-out" class="sidenav-trigger show-on-large"><i class="material-icons">menu</i></a>
+                        </li>
+                    </ul>
+                    <ul class="right me-3">
+                        <li><a href="#help"><i class="material-icons">help</i></a></li>
+                    </ul>
+                </div>
+            </nav>
+        </div>
+        <ul id="slide-out" class="sidenav">
+        </ul>
+        <div class="player valign-wrapper center-align">
+            <div class="m-2">
+                <video id="video" class="z-depth-5"
+                    preload="metadata"
+                    autoplay=""
+                    webkit-playsinline=""
+                    playsinline=""
+                    type="video/mp4"
+                    width="100%"
+                    controls=""
+                    crossorigin="anonymous"/>
             </div>
         </div>
-        <div id="div_files"></div>
+
         <script src="/js"></script>
         <script>
             init();
         </script>
+
+        <!--JavaScript at end of body for optimized loading-->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+
+        <script>
+
+            document.addEventListener('DOMContentLoaded', function() {
+                const options = {};
+                const elems = document.querySelectorAll('.sidenav');
+                const instances = M.Sidenav.init(elems, options);
+            });
+
+        </script>
     </body>
 </html>
+
