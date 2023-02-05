@@ -16,13 +16,16 @@ function init(){
         if (this.readyState === 4 && this.status === 200) {
             var obj = JSON.parse(Http.responseText);
 
-            var div_files = document.getElementById("div_files");
+            var container = document.getElementById("slide-out");
             for (var i in obj.files){
-                var a = document.createElement("button");
-                a.setAttribute("data-file", obj.files[i]);
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.setAttribute('data-file', obj.files[i]);
+                a.setAttribute('class', 'truncate sidenav-close white-text');
+                a.setAttribute('href', '#!');
+
                 a.onclick = function(){
                     var file = this.getAttribute('data-file');
-                    console.log(window.location.host, file);
                     var video = document.getElementById('video');
                     var n = file.lastIndexOf(".");
                     addSourceToVideo(video, file, "video/"+file.substr(n+1));
@@ -37,9 +40,10 @@ function init(){
 
                     video.play();
                 };
-                var l = obj.files[i].lastIndexOf("/");
+                const l = obj.files[i].lastIndexOf("/");
                 a.appendChild(document.createTextNode(obj.files[i].substr(l+1)));
-                div_files.appendChild(a);
+                li.appendChild(a);
+                container.appendChild(li);
             }
         }
     };
