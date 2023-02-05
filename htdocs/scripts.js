@@ -21,7 +21,7 @@ function init(){
                 const li = document.createElement('li');
                 const a = document.createElement('a');
                 a.setAttribute('data-file', obj.files[i]);
-                a.setAttribute('class', 'truncate sidenav-close');
+                a.setAttribute('class', 'truncate sidenav-close white-text');
                 a.setAttribute('href', '#!');
 
                 a.onclick = function(){

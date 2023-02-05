@@ -1,6 +1,14 @@
 html, body {
     background-color: #000;
-    min-height: 100%;
+    height: calc(100vh - 70px);
+}
+
+.player {
+    height: calc(100vh - 70px);
+}
+
+video {
+    max-height: calc(100vh - 70px);
 }
 
 .w-100 {
