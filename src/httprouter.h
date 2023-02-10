@@ -12,6 +12,11 @@ typedef std::vector<std::pair<std::regex, RouteHandler>> RouteCollection;
 class Router
 {
 public:
+    Router();
+
+    void SetLogger(
+        std::function<void(const std::string &)> logger);
+
     void Get(
         const std::string &pattern,
         RouteHandler handler);
@@ -25,6 +30,7 @@ public:
         net::Response &response);
 
 private:
+    std::function<void(const std::string &)> _logger;
     RouteCollection _getRoutes;
     RouteCollection _postRoutes;
     RouteCollection _putRoutes;

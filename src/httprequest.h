@@ -14,10 +14,14 @@ class Request
 {
     SOCKET _socket;
     sockaddr_in _clientInfo;
+    std::function<void(const std::string &)> _logging;
     std::string getMessage();
 
 public:
-    Request(SOCKET socket, sockaddr_in clientInfo);
+    Request(
+        SOCKET socket,
+        sockaddr_in clientInfo,
+        std::function<void(const std::string &)> logging);
 
     static void handleRequest(std::function<int(const Request &, class Response &)> onConnection, Request request);
 

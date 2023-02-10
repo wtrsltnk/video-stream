@@ -1,6 +1,16 @@
 #include "httprouter.h"
 
-#include <fmt/chrono.h>
+#include <fmt/format.h>
+
+Router::Router()
+    : _logger([](const std::string &) {})
+{}
+
+void Router::SetLogger(
+    std::function<void(const std::string &)> logger)
+{
+    this->_logger = logger;
+}
 
 void Router::Get(
     const std::string &pattern,
@@ -24,8 +34,6 @@ bool Router::Route(
     const net::Request &request,
     net::Response &response)
 {
-    std::time_t t = std::time(nullptr);
-
     if (request._method == "GET")
     {
         for (auto &route : _getRoutes)
@@ -57,7 +65,7 @@ bool Router::Route(
         return false;
     }
 
-    fmt::print("{:%Y-%m-%d %H:%M:%S} {} {} {}\n", fmt::localtime(t), request._method, request._uri, response._responseCode);
+    _logger(fmt::format("{} {} {}", request._method, request._uri, response._responseCode));
 
     return true;
 }

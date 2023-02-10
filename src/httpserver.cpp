@@ -1,6 +1,7 @@
 #include "httpserver.h"
 #include "httprequest.h"
 #include "httpresponse.h"
+#include <fmt/format.h>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -19,7 +20,7 @@ std::string ToString(
 // Constructor
 HttpServer::HttpServer(
     int port)
-    : _logging([](const std::string &message) { std::cout << message << std::endl; })
+    : _logger([](const std::string &) {})
 {
     // Socket Settings
     ZeroMemory(&_hints, sizeof(_hints));
@@ -36,10 +37,10 @@ HttpServer::HttpServer(
     _result = nullptr;
 }
 
-void HttpServer::SetLogging(
-    std::function<void(const std::string &)> logging)
+void HttpServer::SetLogger(
+    std::function<void(const std::string &)> logger)
 {
-    this->_logging = logging;
+    this->_logger = logger;
 }
 
 int HttpServer::Port() const
@@ -54,21 +55,16 @@ void HttpServer::SetPort(
 
 std::string HttpServer::LocalUrl() const
 {
-    std::stringstream ss;
-
-    ss << "http://localhost:" << _port << "/";
-
-    return ss.str();
+    return fmt::format("http://localhost:{}/", _port);
 }
 
-// Main Functions
 bool HttpServer::Init()
 {
     // Start Winsocket
     auto resultCode = WSAStartup(_socketVersion, &_wsaData);
     if (0 != resultCode)
     {
-        this->_logging("Initialize Failed \nError Code : " + ToString(resultCode));
+        this->_logger("Initialize Failed \nError Code : " + ToString(resultCode));
         return false;
     }
 
@@ -83,7 +79,9 @@ bool HttpServer::Start()
     auto resultCode = getaddrinfo(nullptr, port.c_str(), &_hints, &_result);
     if (0 != resultCode)
     {
-        this->_logging("Resolving Address And Port Failed \nError Code: " + ToString(resultCode));
+        this->_logger("Resolving Address And Port Failed");
+        this->_logger(fmt::format("Error Code: {}", ToString(resultCode)));
+
         return false;
     }
 
@@ -91,7 +89,8 @@ bool HttpServer::Start()
     _listeningSocket = socket(_hints.ai_family, _hints.ai_socktype, _hints.ai_protocol);
     if (INVALID_SOCKET == _listeningSocket)
     {
-        this->_logging("Could't Create Socket");
+        this->_logger("Could't Create Socket");
+
         return false;
     }
 
@@ -99,7 +98,8 @@ bool HttpServer::Start()
     resultCode = bind(_listeningSocket, _result->ai_addr, static_cast<int>(_result->ai_addrlen));
     if (SOCKET_ERROR == resultCode)
     {
-        this->_logging("Bind Socket Failed");
+        this->_logger("Bind Socket Failed");
+
         return false;
     }
 
@@ -107,12 +107,14 @@ bool HttpServer::Start()
     resultCode = listen(_listeningSocket, _maxConnections);
     if (SOCKET_ERROR == resultCode)
     {
-        this->_logging("Listening On Port " + ToString(_port) + " Failed");
+        this->_logger(fmt::format("Listening On Port {} Failed", ToString(_port)));
+
         return false;
     }
     else
     {
-        this->_logging("-Server Is Up And Running.\n--Listening On Port " + ToString(_port) + "...");
+        this->_logger("Server Is Up And Running.");
+        this->_logger(fmt::format("Listening On Port {}", ToString(_port)));
     }
 
     return true;
@@ -127,13 +129,14 @@ void HttpServer::WaitForRequests(
     auto socket = accept(_listeningSocket, reinterpret_cast<sockaddr *>(&clientInfo), &clientInfoSize);
     if (INVALID_SOCKET == socket)
     {
-        this->_logging("Accepting Connection Failed");
+        this->_logger("Accepting Connection Failed");
     }
     else
     {
-        this->_logging("Spinning thread to handle request");
+        this->_logger("Spinning thread to handle request");
 
-        std::thread t(Request::handleRequest, onConnection, Request(socket, clientInfo));
+        std::thread t(Request::handleRequest, onConnection, Request(socket, clientInfo, _logger));
+
         t.detach();
     }
 }

@@ -2,9 +2,11 @@
 #include "httpresponse.h"
 #include "httprouter.h"
 #include "httpserver.h"
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fmt/chrono.h>
+#include <fmt/format.h>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -17,7 +19,32 @@
 
 #define MAX_RANGE_SIZE (5000000)
 
+const char DirectorySeparatorChar = '\\';
+const char AltDirectorySeparatorChar = '/';
+
+static bool _isRunning = true;
+
 int onRecieveRequest(const net::Request &request, net::Response &response);
+
+void LogMessageAtLevel(
+    const std::string &level,
+    const std::string &message)
+{
+    std::time_t t = std::time(nullptr);
+    fmt::print("{:%Y-%m-%d %H:%M:%S} [{}] {}\n", fmt::localtime(t), level, message);
+}
+
+void LogInfo(
+    const std::string &message)
+{
+    LogMessageAtLevel("INF", message);
+}
+
+void LogError(
+    const std::string &message)
+{
+    LogMessageAtLevel("ERR", message);
+}
 
 void GetFiles(
     std::vector<std::string> &files,
@@ -29,8 +56,6 @@ nlohmann::json GetFilesAsJson(
 
 std::string urlDecode(
     const std::string &SRC);
-
-static bool _isRunning = true;
 
 bool DoesFileExist(
     net::Response &response,
@@ -74,31 +99,33 @@ void FileRangeResponse(
     }
 
     bool rangeRequested = false;
-    unsigned long rangeStart = 0;
-    unsigned long rangeEnd = 0;
+    long long rangeStart = 0;
+    long long rangeEnd = 0;
 
     for (auto &header : request._headers)
     {
-        if (header.first.compare("Range") == 0)
+        if (header.first.compare("Range") != 0)
         {
-            fmt::print("Range: {}\n", header.second);
+            continue;
+        }
 
-            std::regex pattern("bytes=([0-9]+)\\-([0-9]*)");
-            auto words_begin = std::sregex_iterator(header.second.begin(), header.second.end(), pattern);
+        std::regex pattern("bytes=([0-9]+)\\-([0-9]*)");
+        auto words_begin = std::sregex_iterator(header.second.begin(), header.second.end(), pattern);
 
-            if ((*words_begin).size() >= 3)
-            {
-                rangeRequested = true;
+        if ((*words_begin).size() < 3)
+        {
+            continue;
+        }
 
-                if ((*words_begin)[1].str().size() > 0)
-                {
-                    rangeStart = std::stoul((*words_begin)[1].str());
-                }
-                if ((*words_begin)[2].str().size() > 0)
-                {
-                    rangeEnd = std::stoul((*words_begin)[2].str());
-                }
-            }
+        rangeRequested = true;
+
+        if ((*words_begin)[1].str().size() > 0)
+        {
+            rangeStart = std::stoll((*words_begin)[1].str());
+        }
+        if ((*words_begin)[2].str().size() > 0)
+        {
+            rangeEnd = std::stoll((*words_begin)[2].str());
         }
     }
 
@@ -108,7 +135,7 @@ void FileRangeResponse(
 
     if (rangeStart > 0 && rangeEnd == 0)
     {
-        rangeEnd = std::min<int>(size, rangeStart + MAX_RANGE_SIZE);
+        rangeEnd = std::min<long long>(size, rangeStart + MAX_RANGE_SIZE);
     }
 
     if (rangeEnd > size)
@@ -120,8 +147,6 @@ void FileRangeResponse(
 
     if (!rangeRequested || size < MAX_RANGE_SIZE)
     {
-        fmt::print("rangeRequested: {}\n", rangeRequested);
-
         response._responseCode = 200;
 
         stream.seekg(0, stream.beg);
@@ -154,11 +179,6 @@ void FileRangeResponse(
         auto contentRange = fmt::format("bytes {}-{}/{}", rangeStart, rangeEnd - 1, size);
         response.addHeader("Content-Range", contentRange);
 
-        fmt::print("Content-Range: {}\n", contentRange);
-
-        // the following is needed for when VLC is requesting a stream, dont ask me why:
-        // see for more info: https://stackoverflow.com/questions/61459515/using-http-range-request-to-stream-video-files
-        // response._contentSize = size;
         response._response = buffer;
     }
 }
@@ -178,7 +198,12 @@ int main(
     static std::filesystem::path videoRoot = std::filesystem::current_path() / ".." / "video-stream";
     static std::filesystem::path contentRoot = std::filesystem::current_path() / ".." / "video-stream";
 
-    if (argc > 1)
+    if (argc > 2)
+    {
+        videoRoot = argv[1];
+        contentRoot = argv[2];
+    }
+    else if (argc > 1)
     {
         videoRoot = argv[1];
         contentRoot = argv[1];
@@ -186,31 +211,33 @@ int main(
 
     if (!std::filesystem::exists(videoRoot))
     {
-        std::cout << videoRoot << " does not exist" << std::endl;
+        LogError(fmt::format("{} does not exist", videoRoot.string()));
 
         return 0;
     }
 
     if (!std::filesystem::exists(contentRoot))
     {
-        std::cout << contentRoot << " does not exist" << std::endl;
+        LogError(fmt::format("{} does not exist", contentRoot.string()));
 
         return 0;
     }
 
-    std::cout << videoRoot << " is our video root" << std::endl;
-    std::cout << contentRoot << " is our content root" << std::endl;
+    LogInfo(fmt::format("{} is our video root", videoRoot.string()));
+    LogInfo(fmt::format("{} is our content root", contentRoot.string()));
 
-    net::HttpServer _server(80);
+    net::HttpServer server(80);
+    Router router;
 
-    _server.Init();
+    server.SetLogger(LogInfo);
+    router.SetLogger(LogInfo);
 
-    if (!_server.Start())
+    server.Init();
+
+    if (!server.Start())
     {
         return 0;
     }
-
-    Router router;
 
     router.Get("/", [&](const net::Request &, net::Response &response, const std::smatch &) {
         FileResponse(response, contentRoot / "htdocs" / "index.html", "text/html");
@@ -251,7 +278,7 @@ int main(
 
     while (_isRunning)
     {
-        _server.WaitForRequests([&](const net::Request &request, net::Response &response) -> int {
+        server.WaitForRequests([&](const net::Request &request, net::Response &response) -> int {
             router.Route(request, response);
 
             return response._responseCode;
@@ -261,19 +288,22 @@ int main(
     return 0;
 }
 
-const char DirectorySeparatorChar = '\\';
-const char AltDirectorySeparatorChar = '/';
-#include <algorithm>
-
-std::string FileExtension(std::string const &fullpath)
+std::string FileExtension(
+    std::string const &fullpath)
 {
     auto i = fullpath.length();
     while (--i > 0)
     {
         if (fullpath[i] == DirectorySeparatorChar)
+        {
             return "";
+        }
+
         if (fullpath[i] == AltDirectorySeparatorChar)
+        {
             return "";
+        }
+
         if (fullpath[i] == '.')
         {
             auto data = fullpath.substr(i);
@@ -309,7 +339,6 @@ void GetFiles(
 
     std::filesystem::path lookFor = root / relativePath / "*";
 
-    std::cout << lookFor << std::endl;
     hFind = FindFirstFile(lookFor.string().c_str(), &data);
     if (hFind != INVALID_HANDLE_VALUE)
     {
@@ -349,7 +378,7 @@ std::string urlDecode(
     {
         if (int(SRC[i]) == 37)
         {
-            sscanf(SRC.substr(i + 1, 2).c_str(), "%x", &ii);
+            sscanf_s(SRC.substr(i + 1, 2).c_str(), "%x", &ii);
             ch = static_cast<char>(ii);
             ret += ch;
             i = i + 2;

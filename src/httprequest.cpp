@@ -81,9 +81,11 @@ static inline std::string &trim(
 
 Request::Request(
     SOCKET socket,
-    sockaddr_in clientInfo)
+    sockaddr_in clientInfo,
+    std::function<void(const std::string &)> logging)
     : _socket(socket),
-      _clientInfo(clientInfo)
+      _clientInfo(clientInfo),
+      _logging(logging)
 {
     std::string allData = getMessage();
     auto pos = allData.find("\r\n\r\n");
@@ -103,7 +105,9 @@ Request::Request(
             {
                 auto version = line.substr(last);
                 if (trim(version) != "HTTP/1.1")
+                {
                     throw new std::runtime_error("invalid HTTP version");
+                }
 
                 auto method = line.substr(0, first);
                 this->_method = trim(method);
@@ -188,12 +192,6 @@ void Request::handleRequest(
 
     while (true)
     {
-        fmt::print("\n============================================================\nRequest Headers\n");
-        for (const auto &header : request._headers)
-        {
-            fmt::print("{}: {}\n", header.first, header.second);
-        }
-
         Response response;
 
         int responseCode = onConnection(request, response);
@@ -215,27 +213,20 @@ void Request::handleRequest(
         }
 
         headerData << "Content-Length: " << contentSize << "\r\n"
-                << "\r\n";
-
-        fmt::print("============================================================\nResponse Headers\n");
-        for (const auto &header : response._headers)
-        {
-            fmt::print("{}: {}\n", header.first, header.second);
-        }
+                   << "\r\n";
 
         auto hdrs = headerData.str();
 
-        send(request._socket, headerData.str().c_str(), headerData.str().size(), 0);
+        send(request._socket, headerData.str().c_str(), static_cast<int>(headerData.str().size()), 0);
 
-        send(request._socket, response._response.c_str(), response._response.size(), 0);
+        send(request._socket, response._response.c_str(), static_cast<int>(response._response.size()), 0);
 
         if (!KeepAlive(request._headers))
         {
-            fmt::print("####### Not keeping this connection alive ####### \n\n");
             break;
         }
 
-        request = Request(request._socket, request._clientInfo);
+        request = Request(request._socket, request._clientInfo, request._logging);
     }
 
     shutdown(request._socket, SD_BOTH);

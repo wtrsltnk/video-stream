@@ -12,7 +12,36 @@ namespace net {
 
 class HttpServer
 {
-    std::function<void(const std::string &)> _logging;
+public:
+    HttpServer(int port = DEFAULT_PORT);
+
+    void SetLogger(
+        std::function<void(const std::string &)> logger);
+
+    int Port() const;
+
+    void SetPort(
+        int port);
+
+    std::string LocalUrl() const;
+
+    bool Init(); // Initialize Server
+
+    bool Start(); // Start server
+
+    void WaitForRequests(
+        std::function<int(const class Request &, class Response &)> onConnection);
+
+    void Stop(); // Close Server
+
+    bool IsStarted() const;
+
+    static void handleRequest(
+        std::function<int(const class Request &, class Response &)> onConnection,
+        class Request request);
+
+private:
+    std::function<void(const std::string &)> _logger;
     WORD _socketVersion;
     WSADATA _wsaData;
     SOCKET _listeningSocket;
@@ -21,23 +50,6 @@ class HttpServer
 
     //  Server Info
     int _port = DEFAULT_PORT;
-
-public:
-    HttpServer(int port = DEFAULT_PORT);
-    void SetLogging(std::function<void(const std::string &)> logging);
-
-    int Port() const;
-    void SetPort(int port);
-
-    std::string LocalUrl() const;
-
-    bool Init();  // Initialize Server
-    bool Start(); // Start server
-    void WaitForRequests(std::function<int(const class Request &, class Response &)> onConnection);
-    void Stop(); // Close Server
-    bool IsStarted() const;
-
-    static void handleRequest(std::function<int(const class Request &, class Response &)> onConnection, class Request request);
 };
 
 } // namespace net
